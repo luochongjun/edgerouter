@@ -1,0 +1,69 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    name: Build for ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            sdk_url_path: https://downloads.openwrt.org/snapshots/targets/x86/64
+            sdk_name: -sdk-x86-64_
+          # - arch: arc_arc700
+          #   sdk_url_path: https://downloads.openwrt.org/snapshots/targets/arc770/generic
+          #   sdk_name: -sdk-arc770-generic_
+          # - arch: arc_archs
+          #   sdk_url_path: https://downloads.openwrt.org/snapshots/targets/archs38/generic
+          #   sdk_name: -sdk-archs38-generic_
+          # - arch: armeb_xscale
+          #   sdk_url_path: https://downloads.openwrt.org/snapshots/targets/ixp4xx/generic
+          #   sdk_name: -sdk-ixp4xx-generic_
+          # - arch: powerpc_464fp
+          #   sdk_url_path: https://downloads.openwrt.org/snapshots/targets/apm821xx/nand
+          #   sdk_name: -sdk-apm821xx-nand_
+          # - arch: powerpc_8540
+          #   sdk_url_path: https://downloads.openwrt.org/snapshots/targets/mpc85xx/generic
+          #   sdk_name: -sdk-mpc85xx-generic_
+
+    env:
+      SDK_URL_PATH: ${{ matrix.sdk_url_path }}
+      SDK_NAME: ${{ matrix.sdk_name }}
+      ARCH: ${{ matrix.arch }}
+      CACHE_DIR: ~/cache
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: ${{ runner.os }}:edgerouter:${{ env.ARCH }}:release:cache:${{ github.run_number }}
+          restore-keys: |
+            ${{ runner.os }}:edgerouter:${{ env.ARCH }}:cache:
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update && \
+            sudo apt-get install -yq gettext libncurses5-dev xsltproc
+
+      - name: Prepare SDK Home
+        run: |
+          echo "SDK_HOME=$(mktemp -d)" >> $GITHUB_ENV
+
+      - name: Build package
+        run: sh compile.sh
+
+      - name: Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.ipk"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
