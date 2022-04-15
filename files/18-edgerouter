@@ -1,0 +1,18 @@
+#!/bin/sh
+
+[ "$ACTION" == "ifup" -o "$ACTION" == "ifdown" ] || exit 1
+[ -n "$INTERFACE" ] || exit 2
+
+[ "$INTERFACE" = "wan" -o "$INTERFACE" = "wwan" ] || exit 1
+
+if [ "$ACTION" == "ifup" ]; then
+        [ -n "$DEVICE" ] || exit 3
+fi
+
+[ "$ACTION" == "ifdown" ] && {
+	/etc/init.d/edgerouter stop
+}
+
+[ "$ACTION" == "ifup" ] && {
+	/etc/init.d/edgerouter restart
+}

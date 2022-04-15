@@ -1,0 +1,49 @@
+#!/bin/sh
+
+create()
+{
+	local LANIP=$(uci get network.lan.ipaddr)
+
+	iptables -N EDGEROUTER_INPUT 2>/dev/null
+	iptables -C INPUT -j EDGEROUTER_INPUT
+	[ ! "$?" = "0" ] && iptables -I INPUT -j EDGEROUTER_INPUT
+	iptables -F EDGEROUTER_INPUT 2>/dev/null
+	iptables -I EDGEROUTER_INPUT -j ACCEPT
+
+	iptables -N EDGEROUTER_FORWARD 2>/dev/null
+	iptables -C FORWARD -j EDGEROUTER_FORWARD
+	[ ! "$?" = "0" ] && iptables -I FORWARD -j EDGEROUTER_FORWARD
+	iptables -F EDGEROUTER_FORWARD 2>/dev/null
+	iptables -I EDGEROUTER_FORWARD -j ACCEPT
+	
+	[ -z "$LANIP" ] && return
+	iptables -t nat -N EDGEROUTER_PREROUTING 2>/dev/null
+	iptables -t nat -C PREROUTING -j EDGEROUTER_PREROUTING
+	[ ! "$?" = "0" ] && iptables -t nat -I PREROUTING -j EDGEROUTER_PREROUTING
+	iptables -t nat  -F EDGEROUTER_PREROUTING 2>/dev/null
+	iptables -t nat -I EDGEROUTER_PREROUTING  -p udp --dport 53 -j DNAT --to "$LANIP"
+	iptables -t nat -I EDGEROUTER_PREROUTING  -p tcp --dport 53 -j DNAT --to "$LANIP"
+}
+
+remove()
+{
+	iptables -t nat -D PREROUTING -j EDGEROUTER_PREROUTING 2>/dev/null
+	iptables -t nat  -F EDGEROUTER_PREROUTING 2>/dev/null
+	iptables -t nat -X EDGEROUTER_PREROUTING 2>/dev/null
+
+	iptables -D FORWARD -j EDGEROUTER_FORWARD 2>/dev/null
+	iptables -F EDGEROUTER_FORWARD 2>/dev/null
+	iptables -X EDGEROUTER_FORWARD 2>/dev/null
+
+	iptables -D INPUT -j EDGEROUTER_INPUT 2>/dev/null
+	iptables -F EDGEROUTER_INPUT 2>/dev/null
+	iptables -X EDGEROUTER_INPUT 2>/dev/null
+}
+
+enabled=`uci get edgerouter.global.enabled`
+if [ "$enabled" = "1" ];then
+	create
+else
+	remove
+fi
+
